@@ -47,6 +47,7 @@ class Assistant(Base):
     description: Mapped[str | None] = mapped_column(Text)
     graph_id: Mapped[str] = mapped_column(Text, nullable=False)
     config: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+    context: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
     user_id: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default=text("now()")
@@ -96,6 +97,7 @@ class Run(Base):
     # Some environments may not yet have a 'config' column; make it nullable without default to match existing DB.
     # If migrations add this column later, it's already represented here.
     config: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    context: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     output: Mapped[dict | None] = mapped_column(JSONB)
     error_message: Mapped[str | None] = mapped_column(Text)
     user_id: Mapped[str] = mapped_column(Text, nullable=False)

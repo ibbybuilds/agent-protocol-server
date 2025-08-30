@@ -52,6 +52,21 @@ async def create_assistant(
         graph = await langgraph_service.get_graph(graph_id)
     except Exception as e:
         raise HTTPException(400, f"Failed to load graph: {str(e)}")
+
+    config = request.config
+    context = request.context
+
+    if config.get("configurable") and context:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot specify both configurable and context. Prefer setting context alone. Context was introduced in LangGraph 0.6.0 and is the long term planned replacement for configurable.",
+        )
+
+    # Keep config and context up to date with one another
+    if config.get("configurable"):
+        context = config["configurable"]
+    elif context:
+        config["configurable"] = context
     
     # Generate assistant_id if not provided
     assistant_id = request.assistant_id or str(uuid4())
@@ -86,7 +101,8 @@ async def create_assistant(
         assistant_id=assistant_id,
         name=name,
         description=request.description,
-        config=request.config or {},
+        config=config,
+        context=context,
         graph_id=graph_id,
         user_id=user.identity
     )

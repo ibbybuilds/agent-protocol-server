@@ -92,6 +92,21 @@ async def create_run(
     available_graphs = langgraph_service.list_graphs()
     resolved_assistant_id = resolve_assistant_id(requested_id, available_graphs)
 
+    config = request.config
+    context = request.context
+
+    if config.get("configurable") and context:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot specify both configurable and context. Prefer setting context alone. Context was introduced in LangGraph 0.6.0 and is the long term planned replacement for configurable.",
+        )
+
+    # Keep config and context up to date with one another
+    if config.get("configurable"):
+        context = config["configurable"]
+    elif context:
+        config["configurable"] = context
+
     assistant_stmt = select(AssistantORM).where(
         AssistantORM.assistant_id == resolved_assistant_id,
     )
@@ -116,7 +131,8 @@ async def create_run(
         assistant_id=resolved_assistant_id,
         status="pending",
         input=request.input or {},
-        config=request.config or {},
+        config=config,
+        context=context,
         user_id=user.identity,
         created_at=now,
         updated_at=now,
@@ -133,7 +149,8 @@ async def create_run(
         assistant_id=resolved_assistant_id,
         status="pending",
         input=request.input or {},
-        config=request.config or {},
+        config=config,
+        context=context,
         user_id=user.identity,
         created_at=now,
         updated_at=now,
@@ -150,7 +167,8 @@ async def create_run(
             assistant.graph_id,
             request.input or {},
             user,
-            request.config,
+            config,
+            context,
             request.stream_mode,
             None,  # Don't pass session to avoid conflicts
             request.checkpoint,
@@ -183,6 +201,21 @@ async def create_and_stream_run(
 
     resolved_assistant_id = resolve_assistant_id(requested_id, available_graphs)
 
+    config = request.config
+    context = request.context
+
+    if config.get("configurable") and context:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot specify both configurable and context. Prefer setting context alone. Context was introduced in LangGraph 0.6.0 and is the long term planned replacement for configurable.",
+        )
+
+    # Keep config and context up to date with one another
+    if config.get("configurable"):
+        context = config["configurable"]
+    elif context:
+        config["configurable"] = context
+
     assistant_stmt = select(AssistantORM).where(
         AssistantORM.assistant_id == resolved_assistant_id,
     )
@@ -207,7 +240,8 @@ async def create_and_stream_run(
         assistant_id=resolved_assistant_id,
         status="streaming",
         input=request.input or {},
-        config=request.config or {},
+        config=config,
+        context=context,
         user_id=user.identity,
         created_at=now,
         updated_at=now,
@@ -224,7 +258,8 @@ async def create_and_stream_run(
         assistant_id=resolved_assistant_id,
         status="streaming",
         input=request.input or {},
-        config=request.config or {},
+        config=config,
+        context=context,
         user_id=user.identity,
         created_at=now,
         updated_at=now,
@@ -241,7 +276,8 @@ async def create_and_stream_run(
             assistant.graph_id,
             request.input or {},
             user,
-            request.config,
+            config,
+            context,
             request.stream_mode,
             None,  # Don't pass session to avoid conflicts
             request.checkpoint,
@@ -252,8 +288,8 @@ async def create_and_stream_run(
 
     # Extract requested stream mode(s)
     stream_mode = request.stream_mode
-    if not stream_mode and request.config and "stream_mode" in request.config:
-        stream_mode = request.config["stream_mode"]
+    if not stream_mode and config and "stream_mode" in config:
+        stream_mode = config["stream_mode"]
 
     # Stream immediately from broker (which will also include replay of any early events)
     cancel_on_disconnect = (request.on_disconnect or "continue").lower() == "cancel"
@@ -534,6 +570,7 @@ async def execute_run_async(
     input_data: dict,
     user: User,
     config: Optional[dict] = None,
+    context: Optional[dict] = None,
     stream_mode: Optional[list[str]] = None,
     session: Optional[AsyncSession] = None,
     checkpoint: Optional[dict] = None,
@@ -570,6 +607,7 @@ async def execute_run_async(
             async for raw_event in graph.astream(
                 input_data,
                 config=run_config,
+                context=context,
                 stream_mode=stream_mode or RUN_STREAM_MODES,
             ):
                 event_counter += 1

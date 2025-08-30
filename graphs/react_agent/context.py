@@ -2,18 +2,16 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field, fields
 from typing import Annotated
 
-from langchain_core.runnables import ensure_config
-from langgraph.config import get_config
-
-from graphs.react_agent import prompts
+from . import prompts
 
 
 @dataclass(kw_only=True)
-class Configuration:
-    """The configuration for the agent."""
+class Context:
+    """The context for the agent."""
 
     system_prompt: str = field(
         default=prompts.SYSTEM_PROMPT,
@@ -38,14 +36,11 @@ class Configuration:
         },
     )
 
-    @classmethod
-    def from_context(cls) -> Configuration:
-        """Create a Configuration instance from a RunnableConfig object."""
-        try:
-            config = get_config()
-        except RuntimeError:
-            config = None
-        config = ensure_config(config)
-        configurable = config.get("configurable") or {}
-        _fields = {f.name for f in fields(cls) if f.init}
-        return cls(**{k: v for k, v in configurable.items() if k in _fields})
+    def __post_init__(self) -> None:
+        """Fetch env vars for attributes that were not passed as args."""
+        for f in fields(self):
+            if not f.init:
+                continue
+
+            if getattr(self, f.name) == f.default:
+                setattr(self, f.name, os.environ.get(f.name.upper(), f.default))

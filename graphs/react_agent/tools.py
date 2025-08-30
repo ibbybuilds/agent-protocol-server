@@ -6,9 +6,11 @@ These tools are intended as free examples to get started. For production use,
 consider implementing more robust and specialized tools tailored to your needs.
 """
 
-from typing import Any, Callable, List, Optional
+from typing import Any, Callable, List, Optional, cast
 
-from graphs.react_agent.configuration import Configuration
+from langgraph.runtime import get_runtime
+
+from graphs.react_agent.context import Context
 
 
 async def search(query: str) -> Optional[dict[str, Any]]:
@@ -18,8 +20,10 @@ async def search(query: str) -> Optional[dict[str, Any]]:
     to provide comprehensive, accurate, and trusted results. It's particularly useful
     for answering questions about current events.
     """
-    configuration = Configuration.from_context()
-    return {"status": "success", "message": "Search successful"}
+    runtime = get_runtime(Context)
+    return {"query": query,
+            "max_search_results": runtime.context.max_search_results,
+            "results": f"Simulated search results for '{query}'"}
 
 
 TOOLS: List[Callable[..., Any]] = [search]

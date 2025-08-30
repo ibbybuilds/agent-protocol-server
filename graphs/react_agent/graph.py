@@ -9,8 +9,9 @@ from typing import Dict, List, Literal, cast
 from langchain_core.messages import AIMessage
 from langgraph.graph import StateGraph
 from langgraph.prebuilt import ToolNode
+from langgraph.runtime import Runtime
 
-from graphs.react_agent.configuration import Configuration
+from graphs.react_agent.context import Context
 from graphs.react_agent.state import InputState, State
 from graphs.react_agent.tools import TOOLS
 from graphs.react_agent.utils import load_chat_model
@@ -18,7 +19,9 @@ from graphs.react_agent.utils import load_chat_model
 # Define the function that calls the model
 
 
-async def call_model(state: State) -> Dict[str, List[AIMessage]]:
+async def call_model(
+    state: State, runtime: Runtime[Context]
+) -> Dict[str, List[AIMessage]]:
     """Call the LLM powering our "agent".
 
     This function prepares the prompt, initializes the model, and processes the response.
@@ -30,13 +33,11 @@ async def call_model(state: State) -> Dict[str, List[AIMessage]]:
     Returns:
         dict: A dictionary containing the model's response message.
     """
-    configuration = Configuration.from_context()
-
     # Initialize the model with tool binding. Change the model or add more tools here.
-    model = load_chat_model(configuration.model).bind_tools(TOOLS)
+    model = load_chat_model(runtime.context.model).bind_tools(TOOLS)
 
     # Format the system prompt. Customize this to change the agent's behavior.
-    system_message = configuration.system_prompt.format(
+    system_message = runtime.context.system_prompt.format(
         system_time=datetime.now(tz=UTC).isoformat()
     )
 
@@ -65,7 +66,7 @@ async def call_model(state: State) -> Dict[str, List[AIMessage]]:
 
 # Define a new graph
 
-builder = StateGraph(State, input=InputState, config_schema=Configuration)
+builder = StateGraph(State, input_schema=InputState, context_schema=Context)
 
 # Define the two nodes we will cycle between
 builder.add_node(call_model)

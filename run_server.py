@@ -12,6 +12,7 @@ import os
 import sys
 import logging
 import uvicorn
+from dotenv import load_dotenv
 from pathlib import Path
 
 def setup_environment():
@@ -68,4 +69,5 @@ def main():
     )
 
 if __name__ == "__main__":
+    load_dotenv()
     main()

@@ -11,7 +11,8 @@ class RunCreate(BaseModel):
         None,
         description="Input data for the run. Optional when resuming from a checkpoint.",
     )
-    config: Optional[Dict[str, Any]] = Field(None, description="LangGraph execution config")
+    config: Optional[Dict[str, Any]] = Field({}, description="LangGraph execution config")
+    context: Optional[Dict[str, Any]] = Field({}, description="LangGraph execution context")
     checkpoint: Optional[Dict[str, Any]] = Field(
         None,
         description="Checkpoint configuration (e.g., {'checkpoint_id': '...', 'checkpoint_ns': ''})",
@@ -33,7 +34,8 @@ class Run(BaseModel):
     input: Dict[str, Any]
     output: Optional[Dict[str, Any]] = None
     error_message: Optional[str] = None
-    config: Optional[Dict[str, Any]] = None
+    config: Optional[Dict[str, Any]] = {}
+    context: Optional[Dict[str, Any]] = {}
     user_id: str
     created_at: datetime
     updated_at: datetime
