@@ -160,7 +160,7 @@ async def search_assistants(
     if request.graph_id:
         count_stmt = count_stmt.where(AssistantORM.graph_id == request.graph_id)
     
-    total = len(await session.scalars(count_stmt).all())
+    total = len((await session.scalars(count_stmt)).all())
     
     # Apply pagination
     offset = request.offset or 0
