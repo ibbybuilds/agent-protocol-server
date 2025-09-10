@@ -620,6 +620,25 @@ async def cancel_run_endpoint(
         raise HTTPException(404, f"Run '{run_id}' not found after cancellation")
     return Run.model_validate({c.name: getattr(run_orm, c.name) for c in run_orm.__table__.columns})
 
+def _should_skip_event(raw_event: Any) -> bool:
+    """Check if an event should be skipped based on langsmith:nostream tag"""
+    try:
+        # Check if the event has metadata with tags containing 'langsmith:nostream'
+        if isinstance(raw_event, tuple) and len(raw_event) >= 3:
+            # For tuple events, check the third element (metadata tuple)
+            metadata_tuple = raw_event[2]
+            if isinstance(metadata_tuple, tuple) and len(metadata_tuple) >= 2:
+                # Get the second item in the metadata tuple
+                metadata = metadata_tuple[1]
+                if isinstance(metadata, dict) and "tags" in metadata:
+                    tags = metadata["tags"]
+                    if isinstance(tags, list) and "langsmith:nostream" in tags:
+                        return True
+        return False
+    except Exception:
+        # If we can't parse the event structure, don't skip it
+        return False
+
 
 async def execute_run_async(
     run_id: str,
@@ -709,8 +728,13 @@ async def execute_run_async(
                 execution_input,
                 config=run_config,
                 context=context,
+                subgraphs=True,
                 stream_mode=final_stream_modes,
             ):
+                # Skip events that contain langsmith:nostream tag
+                if _should_skip_event(raw_event):
+                    continue
+                
                 event_counter += 1
                 event_id = f"{run_id}_event_{event_counter}"
                 
