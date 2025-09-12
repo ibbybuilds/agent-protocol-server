@@ -224,7 +224,7 @@ async def create_and_stream_run(
         raise HTTPException(404, f"Assistant '{request.assistant_id}' not found")
 
     # If context was not provided, default to the assistant's stored context
-    if not context and assistant and assistant.context:
+    if not context and assistant.context:
         context = assistant.context
         config["configurable"] = context
 
