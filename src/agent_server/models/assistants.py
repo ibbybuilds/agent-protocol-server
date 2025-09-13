@@ -12,6 +12,7 @@ class AssistantCreate(BaseModel):
     config: Optional[Dict[str, Any]] = Field({}, description="Assistant configuration")
     context: Optional[Dict[str, Any]] = Field({}, description="Assistant context")
     graph_id: str = Field(..., description="LangGraph graph ID from aegra.json")
+    metadata: Optional[Dict[str, Any]] = Field({}, description="Metadata to use for searching and filtering assistants.")
     if_exists: Optional[str] = Field("error", description="What to do if assistant exists: error or do_nothing")
 
 
@@ -25,6 +26,7 @@ class Assistant(BaseModel):
     graph_id: str
     user_id: str
     version: int = Field(..., description="The version of the assistant.")
+    metadata: Dict[str, Any] = Field(default_factory=dict, alias="metadata_dict")
     created_at: datetime
     updated_at: datetime
     
@@ -55,14 +57,7 @@ class AssistantSearchRequest(BaseModel):
     graph_id: Optional[str] = Field(None, description="Filter by graph ID")
     limit: Optional[int] = Field(20, le=100, ge=1, description="Maximum results")
     offset: Optional[int] = Field(0, ge=0, description="Results offset")
-
-
-class AssistantSearchResponse(BaseModel):
-    """Response model for assistant search"""
-    assistants: list[Assistant]
-    total: int
-    limit: int
-    offset: int
+    metadata: Optional[Dict[str, Any]] = Field({}, description="Metadata to use for searching and filtering assistants.")
 
 
 class AgentSchemas(BaseModel):

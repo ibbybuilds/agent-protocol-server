@@ -7,7 +7,7 @@ import uuid
 from sqlalchemy import select, update, delete, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models import Assistant, AssistantCreate, AssistantUpdate, AssistantList, AssistantSearchRequest, AssistantSearchResponse, AgentSchemas, User
+from ..models import Assistant, AssistantCreate, AssistantUpdate, AssistantList, AssistantSearchRequest, AgentSchemas, User
 from ..services.langgraph_service import get_langgraph_service
 from ..core.auth_deps import get_current_user
 from ..core.orm import Assistant as AssistantORM, AssistantVersion as AssistantVersionORM, get_session
@@ -33,7 +33,6 @@ async def create_assistant(
     session: AsyncSession = Depends(get_session)
 ):
     """Create a new assistant"""
-    
     # Get LangGraph service to validate graph
     langgraph_service = get_langgraph_service()
     available_graphs = langgraph_service.list_graphs()
@@ -99,6 +98,7 @@ async def create_assistant(
         context=context,
         graph_id=graph_id,
         user_id=user.identity,
+        metadata_dict=request.metadata,
         version=1
     )
     
@@ -116,7 +116,7 @@ async def create_assistant(
         created_at=datetime.now(UTC),
         name=name,
         description=request.description,
-        metadata_dict={},
+        metadata_dict=request.metadata
     )
     session.add(assistant_version_orm)
     await session.commit()
@@ -141,7 +141,7 @@ async def list_assistants(
     )
 
 
-@router.post("/assistants/search", response_model=AssistantSearchResponse)
+@router.post("/assistants/search", response_model=List[Assistant])
 async def search_assistants(
     request: AssistantSearchRequest,
     user: User = Depends(get_current_user),
@@ -160,17 +160,9 @@ async def search_assistants(
     
     if request.graph_id:
         stmt = stmt.where(AssistantORM.graph_id == request.graph_id)
-    
-    # Get total count before pagination
-    count_stmt = select(AssistantORM).where(AssistantORM.user_id == user.identity)
-    if request.name:
-        count_stmt = count_stmt.where(AssistantORM.name.ilike(f"%{request.name}%"))
-    if request.description:
-        count_stmt = count_stmt.where(AssistantORM.description.ilike(f"%{request.description}%"))
-    if request.graph_id:
-        count_stmt = count_stmt.where(AssistantORM.graph_id == request.graph_id)
-    
-    total = len((await session.scalars(count_stmt)).all())
+
+    if request.metadata:
+        stmt = stmt.where(AssistantORM.metadata_dict.op("@>")(request.metadata))
     
     # Apply pagination
     offset = request.offset or 0
@@ -180,12 +172,32 @@ async def search_assistants(
     result = await session.scalars(stmt)
     paginated_assistants = [to_pydantic(a) for a in result.all()]
     
-    return AssistantSearchResponse(
-        assistants=paginated_assistants,
-        total=total,
-        limit=limit,
-        offset=offset
-    )
+    return paginated_assistants
+
+
+@router.post("/assistants/count", response_model=int)
+async def count_assistants(
+    request: AssistantSearchRequest,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session)
+):
+    """Count assistants with filters"""
+    stmt = select(func.count()).where(AssistantORM.user_id == user.identity)
+
+    if request.name:
+        stmt = stmt.where(AssistantORM.name.ilike(f"%{request.name}%"))
+
+    if request.description:
+        stmt = stmt.where(AssistantORM.description.ilike(f"%{request.description}%"))
+
+    if request.graph_id:
+        stmt = stmt.where(AssistantORM.graph_id == request.graph_id)
+
+    if request.metadata:
+        stmt = stmt.where(AssistantORM.metadata_dict.op("@>")(request.metadata))
+
+    total = await session.scalar(stmt)
+    return total or 0
 
 
 @router.get("/assistants/{assistant_id}", response_model=Assistant)
@@ -287,14 +299,6 @@ async def delete_assistant(
     session: AsyncSession = Depends(get_session)
 ):
     """Delete assistant by ID"""
-    # First delete all versions
-    stmt = delete(AssistantVersionORM).where(
-        AssistantVersionORM.assistant_id == assistant_id
-    )
-    await session.execute(stmt)
-    await session.commit()
-
-    # Then delete the assistant itself
     stmt = select(AssistantORM).where(
         AssistantORM.assistant_id == assistant_id,
         AssistantORM.user_id == user.identity
@@ -352,7 +356,7 @@ async def set_assistant_latest(
     return to_pydantic(updated_assistant)
 
 
-@router.post("/assistants/{assistant_id}/versions", response_model=AssistantList)
+@router.post("/assistants/{assistant_id}/versions", response_model=List[Assistant])
 async def list_assistant_versions(
     assistant_id: str,
     user: User = Depends(get_current_user),
@@ -392,10 +396,7 @@ async def list_assistant_versions(
         ) for v in versions
     ]
 
-    return AssistantList(
-        assistants=version_list,
-        total=len(version_list)
-    )
+    return version_list
 
 
 @router.get("/assistants/{assistant_id}/schemas", response_model=AgentSchemas)

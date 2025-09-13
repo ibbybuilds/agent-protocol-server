@@ -41,6 +41,7 @@ dependencies = [
     "sqlalchemy>=2.0.0",
     "uvicorn>=0.35.0",
     "langfuse>=3.3.4",
+    "langgraph-sdk==0.2.4",
 ]
 
 [project.urls]

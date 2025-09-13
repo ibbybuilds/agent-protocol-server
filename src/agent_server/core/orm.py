@@ -50,6 +50,7 @@ class Assistant(Base):
     context: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
     user_id: Mapped[str] = mapped_column(Text, nullable=False)
     version: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
+    metadata_dict: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'::jsonb"), name="metadata")
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default=text("now()")
     )
@@ -70,7 +71,7 @@ class AssistantVersion(Base):
     __tablename__ = "assistant_versions"
 
     assistant_id: Mapped[str] = mapped_column(
-        Text, ForeignKey("assistant.assistant_id"), primary_key=True
+        Text, ForeignKey("assistant.assistant_id", ondelete="CASCADE"), primary_key=True
     )
     version: Mapped[int] = mapped_column(Integer, primary_key=True)
     graph_id: Mapped[str] = mapped_column(Text, nullable=False)
@@ -111,7 +112,7 @@ class Run(Base):
     # TEXT PK with DB-side generation using uuid_generate_v4()::text
     run_id: Mapped[str] = mapped_column(Text, primary_key=True, server_default=text("uuid_generate_v4()::text"))
     thread_id: Mapped[str] = mapped_column(Text, ForeignKey("thread.thread_id", ondelete="CASCADE"), nullable=False)
-    assistant_id: Mapped[str | None] = mapped_column(Text, ForeignKey("assistant.assistant_id"))
+    assistant_id: Mapped[str | None] = mapped_column(Text, ForeignKey("assistant.assistant_id", ondelete="CASCADE"))
     status: Mapped[str] = mapped_column(Text, server_default=text("'pending'"))
     input: Mapped[dict | None] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
     # Some environments may not yet have a 'config' column; make it nullable without default to match existing DB.
